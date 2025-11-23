@@ -8,56 +8,30 @@ import { getPercentages } from "@/utils/personalityCalculator";
 import PersonalityBar from "@/components/PersonalityBar";
 import DimensionDetail from "@/components/DimensionDetail";
 import { Users, TrendingUp, BarChart3, Target } from "lucide-react";
-
-const dimensionDetails = {
-  timeHorizon: {
-    title: "Time Horizon",
-    shortTerm: {
-      description: "You prefer seeing results quickly and making decisions that provide immediate feedback. Short-term strategies and quick wins keep you motivated and engaged with your investments.",
-    },
-    longTerm: {
-      description: "You likely focus on building wealth steadily over time and prefer strategies that compound over years. Patience and long-term thinking guide your investment decisions.",
-    },
-  },
-  riskTolerance: {
-    title: "Risk Tolerance",
-    highRisk: {
-      description: "You're comfortable with volatility and potential for higher returns. You understand that greater risk can lead to greater rewards and are willing to accept market fluctuations.",
-    },
-    lowRisk: {
-      description: "You prefer stability and security in your investments. Conservative strategies that protect your capital while providing steady growth align with your financial comfort zone.",
-    },
-  },
-  complexity: {
-    title: "Investment Complexity",
-    clarity: {
-      description: "You value simplicity and clear, straightforward investment strategies. Easy-to-understand options that don't require deep financial knowledge work best for you.",
-    },
-    complexity: {
-      description: "You enjoy diving into the details and understanding sophisticated investment strategies. Complex financial instruments and advanced strategies appeal to your analytical nature.",
-    },
-  },
-  consistency: {
-    title: "Investment Style",
-    consistent: {
-      description: "You prefer regular, predictable returns through consistent investment patterns. Steady contributions and gradual growth keep you motivated and on track.",
-    },
-    lumpSum: {
-      description: "You're drawn to opportunities for significant gains, even if they require larger initial investments or waiting periods. Big wins and major milestones drive your investment approach.",
-    },
-  },
-};
+import { generateInvestorReport, InvestorReport } from "@/utils/generateInvestorReport";
 
 const Results = () => {
   const navigate = useNavigate();
   const { personalityType, personalityScores, role } = useUser();
-  const [hoveredDimension, setHoveredDimension] = useState<string | null>(null);
+  const [hoveredDimension, setHoveredDimension] = useState<keyof InvestorReport["dimensions"] | null>(null);
+
+  const [report, setReport] = useState<InvestorReport | null>(null);
+  const [loadingReport, setLoadingReport] = useState(true);
 
   useEffect(() => {
-    if (!personalityType || !personalityScores) {
-      navigate("/quiz");
-    }
-  }, [personalityType, personalityScores, navigate]);
+    if (!personalityType || !personalityScores) return;
+
+    (async () => {
+      setLoadingReport(true);
+      try {
+        const result = await generateInvestorReport(personalityType, personalityScores, role);
+        setReport(result);
+      } catch (err) {
+        console.error("AI error:", err);
+      }
+      setLoadingReport(false);
+    })();
+  }, [personalityType, personalityScores, role]);
 
   if (!personalityType || !personalityScores) {
     return null;
@@ -65,63 +39,51 @@ const Results = () => {
 
   const percentages = getPercentages(personalityScores);
 
-  const getDimensionDetail = (dimension: string) => {
-    const isLongTerm = percentages.longTerm >= 50;
-    const isLowRisk = percentages.lowRisk >= 50;
-    const isComplex = percentages.complexity >= 50;
-    const isLumpSum = percentages.lumpSum >= 50;
+  const getAIDimensionDetail = (dimension: keyof InvestorReport["dimensions"]) => {
+  if (!report) return null;
 
-    switch (dimension) {
-      case "timeHorizon":
-        return {
-          ...dimensionDetails.timeHorizon,
-          percentage: isLongTerm ? percentages.longTerm : 100 - percentages.longTerm,
-          dominantLabel: isLongTerm ? "Long-Term" : "Short-Term",
-          color: "#4398b4",
-          description: isLongTerm 
-            ? dimensionDetails.timeHorizon.longTerm.description
-            : dimensionDetails.timeHorizon.shortTerm.description,
-          illustration: <Users className="w-32 h-32 text-muted-foreground/20" />,
-        };
-      case "riskTolerance":
-        return {
-          ...dimensionDetails.riskTolerance,
-          percentage: isLowRisk ? percentages.lowRisk : 100 - percentages.lowRisk,
-          dominantLabel: isLowRisk ? "Low Risk" : "High Risk",
-          color: "#e4ae3a",
-          description: isLowRisk
-            ? dimensionDetails.riskTolerance.lowRisk.description
-            : dimensionDetails.riskTolerance.highRisk.description,
-          illustration: <TrendingUp className="w-32 h-32 text-muted-foreground/20" />,
-        };
-      case "complexity":
-        return {
-          ...dimensionDetails.complexity,
-          percentage: isComplex ? percentages.complexity : 100 - percentages.complexity,
-          dominantLabel: isComplex ? "Complexity" : "Clarity",
-          color: "#33a474",
-          description: isComplex
-            ? dimensionDetails.complexity.complexity.description
-            : dimensionDetails.complexity.clarity.description,
-          illustration: <BarChart3 className="w-32 h-32 text-muted-foreground/20" />,
-        };
-      case "consistency":
-        return {
-          ...dimensionDetails.consistency,
-          percentage: isLumpSum ? percentages.lumpSum : 100 - percentages.lumpSum,
-          dominantLabel: isLumpSum ? "Lump Sum" : "Consistent Yield",
-          color: "#f25e62",
-          description: isLumpSum
-            ? dimensionDetails.consistency.lumpSum.description
-            : dimensionDetails.consistency.consistent.description,
-          illustration: <Target className="w-32 h-32 text-muted-foreground/20" />,
-        };
-      default:
-        return null;
-    }
+    return {
+      title:
+        dimension === "timeHorizon"
+          ? "Time Horizon"
+          : dimension === "riskTolerance"
+          ? "Risk Tolerance"
+          : dimension === "complexity"
+          ? "Investment Complexity"
+          : "Investment Style",
+
+      percentage:
+        dimension === "timeHorizon"
+          ? percentages.longTerm
+          : dimension === "riskTolerance"
+          ? percentages.lowRisk
+          : dimension === "complexity"
+          ? percentages.complexity
+          : percentages.lumpSum,
+
+      dominantLabel: report.dimensions[dimension].dominantLabel,
+      description: report.dimensions[dimension].description,
+      color:
+        dimension === "timeHorizon"
+          ? "#4398b4"
+          : dimension === "riskTolerance"
+          ? "#e4ae3a"
+          : dimension === "complexity"
+          ? "#33a474"
+          : "#f25e62",
+
+      illustration:
+        dimension === "timeHorizon"
+          ? <Users className="w-32 h-32 text-muted-foreground/20" />
+          : dimension === "riskTolerance"
+          ? <TrendingUp className="w-32 h-32 text-muted-foreground/20" />
+          : dimension === "complexity"
+          ? <BarChart3 className="w-32 h-32 text-muted-foreground/20" />
+          : <Target className="w-32 h-32 text-muted-foreground/20" />,
+    };
   };
 
-  const currentDetail = hoveredDimension ? getDimensionDetail(hoveredDimension) : null;
+  const currentDetail = hoveredDimension ? getAIDimensionDetail(hoveredDimension) : null;
 
   return (
     <div className="min-h-screen py-12 px-4">
