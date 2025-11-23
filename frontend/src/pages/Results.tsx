@@ -12,7 +12,7 @@ import { generateInvestorReport, InvestorReport } from "@/utils/generateInvestor
 const Results = () => {
   const navigate = useNavigate();
   const { personalityType, personalityScores, role } = useUser();
-  const [hoveredDimension, setHoveredDimension] = useState<keyof InvestorReport["dimensions"] | null>(null);
+  const [hoveredDimension, setHoveredDimension] = useState<keyof InvestorReport["dimensions"]>("timeHorizon");
 
   const [report, setReport] = useState<InvestorReport | null>(null);
   const [loadingReport, setLoadingReport] = useState(true);
@@ -97,7 +97,7 @@ const Results = () => {
     return { title, percentage, dominantLabel, description, color };
   };
 
-  const currentDetail = hoveredDimension ? getAIDimensionDetail(hoveredDimension) : null;
+  const currentDetail = getAIDimensionDetail(hoveredDimension);
 
   return (
     <div className="min-h-screen py-12 px-4">
@@ -139,7 +139,7 @@ const Results = () => {
                 color="#4398b4"
                 delay={400}
                 onHover={() => setHoveredDimension("timeHorizon")}
-                onLeave={() => setHoveredDimension(null)}
+                onLeave={() => setHoveredDimension("timeHorizon")}
               />
 
               <PersonalityBar
@@ -149,7 +149,7 @@ const Results = () => {
                 color="#e4ae3a"
                 delay={600}
                 onHover={() => setHoveredDimension("riskTolerance")}
-                onLeave={() => setHoveredDimension(null)}
+                onLeave={() => setHoveredDimension("timeHorizon")}
               />
 
               <PersonalityBar
@@ -159,7 +159,7 @@ const Results = () => {
                 color="#33a474"
                 delay={800}
                 onHover={() => setHoveredDimension("complexity")}
-                onLeave={() => setHoveredDimension(null)}
+                onLeave={() => setHoveredDimension("timeHorizon")}
               />
 
               <PersonalityBar
@@ -169,27 +169,19 @@ const Results = () => {
                 color="#f25e62"
                 delay={1000}
                 onHover={() => setHoveredDimension("consistency")}
-                onLeave={() => setHoveredDimension(null)}
+                onLeave={() => setHoveredDimension("timeHorizon")}
               />
             </div>
           </Card>
 
           <div className="animate-slide-up" style={{ animationDelay: "400ms" }}>
-            {currentDetail ? (
-              <DimensionDetail
-                title={currentDetail.title}
-                percentage={currentDetail.percentage}
-                dominantLabel={currentDetail.dominantLabel}
-                color={currentDetail.color}
-                description={currentDetail.description}
-              />
-            ) : (
-              <Card className="p-6 space-y-6 shadow-elevated h-full flex items-center justify-center min-h-[500px]">
-                <div className="text-center text-muted-foreground">
-                  <p className="text-lg">Hover over a dimension to learn more</p>
-                </div>
-              </Card>
-            )}
+            <DimensionDetail
+              title={currentDetail.title}
+              percentage={currentDetail.percentage}
+              dominantLabel={currentDetail.dominantLabel}
+              color={currentDetail.color}
+              description={currentDetail.description}
+            />
           </div>
         </div>
 
