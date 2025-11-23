@@ -3,25 +3,219 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { mockETFs } from "@/data/mockETFs";
 import { ArrowLeft, Bookmark, TrendingUp } from "lucide-react";
 import { useState, useEffect } from "react";
 import Navigation from "@/components/Navigation";
 import { saveActivity } from "@/utils/activityStorage";
 import { useUser } from "@/contexts/UserContext";
+import r1 from "@/assets/r1.jpeg";
+import y1 from "@/assets/y1.jpeg";
+import g1 from "@/assets/g1.jpeg";
+import b1 from "@/assets/b1.jpeg";
 
 const ETFDetail = () => {
 	const { id } = useParams();
 	const navigate = useNavigate();
 	const { role } = useUser();
 	const [comment, setComment] = useState("");
+
+	// Initial comments per ETF - varied across different people, some ETFs have no comments
+	const initialComments: Record<
+		string,
+		Array<{
+			id: string;
+			author: string;
+			content: string;
+			isAdvisor?: boolean;
+			profilePic?: string;
+		}>
+	> = {
+		"1": [
+			{
+				id: "1",
+				author: "Sarah Chen",
+				content:
+					"VOO is my core holding. Rock-solid performance and minimal fees make it perfect for long-term growth.",
+				isAdvisor: true,
+				profilePic: b1,
+			},
+			{
+				id: "2",
+				author: "Maya Rodriguez",
+				content:
+					"I've been invested in VOO for 5 years now. The consistency is impressive!",
+				isAdvisor: false,
+				profilePic: g1,
+			},
+			{
+				id: "3",
+				author: "Jessica Park",
+				content: "Best starter ETF for anyone building wealth steadily.",
+				isAdvisor: false,
+				profilePic: y1,
+			},
+			{
+				id: "4",
+				author: "Elena Volkov",
+				content:
+					"Low expense ratio and broad diversification - can't go wrong with this one.",
+				isAdvisor: true,
+				profilePic: r1,
+			},
+		],
+		"2": [
+			{
+				id: "1",
+				author: "Priya Sharma",
+				content:
+					"QQQ has been fantastic for tech exposure. Higher volatility but worth it for the returns.",
+				isAdvisor: true,
+				profilePic: y1,
+			},
+			{
+				id: "2",
+				author: "Nina Torres",
+				content: "Love this for my growth portfolio. Tech isn't going anywhere!",
+				isAdvisor: false,
+				profilePic: b1,
+			},
+			{
+				id: "3",
+				author: "Aisha Johnson",
+				content: "Been riding the tech wave with QQQ. No regrets so far.",
+				isAdvisor: false,
+				profilePic: r1,
+			},
+		],
+		"3": [
+			{
+				id: "1",
+				author: "Laura Kim",
+				content:
+					"Perfect for the conservative portion of my portfolio. Bonds provide stability when stocks get choppy.",
+				isAdvisor: true,
+				profilePic: g1,
+			},
+			{
+				id: "2",
+				author: "Olivia Martinez",
+				content: "Not exciting but that's the point. This is my safety net.",
+				isAdvisor: false,
+				profilePic: b1,
+			},
+		],
+		"4": [
+			{
+				id: "1",
+				author: "Rachel Goldstein",
+				content:
+					"ARKK is wild! High risk but Cathie Wood's picks have been interesting to follow.",
+				isAdvisor: false,
+				profilePic: r1,
+			},
+			{
+				id: "2",
+				author: "Sophia Anderson",
+				content:
+					"Only put in what you can afford to lose. This is definitely not for the faint of heart.",
+				isAdvisor: true,
+				profilePic: y1,
+			},
+			{
+				id: "3",
+				author: "Diana Chang",
+				content:
+					"Innovation comes with volatility. I keep this as a small portion of my portfolio.",
+				isAdvisor: false,
+				profilePic: g1,
+			},
+			{
+				id: "4",
+				author: "Hannah Lee",
+				content: "Exciting but unpredictable. Watch this one closely if you invest.",
+				isAdvisor: false,
+				profilePic: b1,
+			},
+		],
+		"5": [
+			{
+				id: "1",
+				author: "Victoria Wright",
+				content:
+					"VTI gives you the entire U.S. stock market. Ultimate diversification in one fund.",
+				isAdvisor: true,
+				profilePic: b1,
+			},
+			{
+				id: "2",
+				author: "Natasha Ivanova",
+				content:
+					"I split my portfolio between VTI and international. Simple and effective.",
+				isAdvisor: false,
+				profilePic: r1,
+			},
+			{
+				id: "3",
+				author: "Grace Williams",
+				content:
+					"Can't beat the expense ratio and coverage. This is set-it-and-forget-it investing.",
+				isAdvisor: false,
+				profilePic: y1,
+			},
+		],
+		"6": [
+			{
+				id: "1",
+				author: "Zara Ahmed",
+				content: "SPY is the OG S&P 500 ETF. Super liquid and reliable.",
+				isAdvisor: false,
+				profilePic: g1,
+			},
+		],
+		"7": [
+			{
+				id: "1",
+				author: "Megan Foster",
+				content: "SCHD is my dividend machine. Quality companies with consistent payouts.",
+				isAdvisor: true,
+				profilePic: r1,
+			},
+			{
+				id: "2",
+				author: "Isabelle Dubois",
+				content: "Great for income investors. The dividend growth is impressive.",
+				isAdvisor: false,
+				profilePic: b1,
+			},
+			{
+				id: "3",
+				author: "Carmen Silva",
+				content: "This is how I fund my side expenses without touching my principal.",
+				isAdvisor: false,
+				profilePic: y1,
+			},
+			{
+				id: "4",
+				author: "Leah Cohen",
+				content: "Love the focus on dividend aristocrats. Rock-solid companies here.",
+				isAdvisor: true,
+				profilePic: g1,
+			},
+		],
+		// ETF "8" (TQQQ) intentionally has no comments - too risky for most people to comment on
+	};
+
 	const [comments, setComments] = useState<
-		Array<{ id: string; author: string; content: string; isAdvisor?: boolean }>
-	>([
-		{ id: "1", author: "Sarah", content: "Great ETF for long-term growth!", isAdvisor: true },
-		{ id: "2", author: "Mike", content: "Low fees and solid performance.", isAdvisor: false },
-	]);
+		Array<{
+			id: string;
+			author: string;
+			content: string;
+			isAdvisor?: boolean;
+			profilePic?: string;
+		}>
+	>(initialComments[id || ""] || []);
 
 	const etf = mockETFs.find((e) => e.id === id);
 
@@ -38,11 +232,16 @@ const ETFDetail = () => {
 
 	const handleAddComment = () => {
 		if (comment.trim()) {
+			// Randomly assign a profile picture
+			const profilePics = [r1, y1, g1, b1];
+			const randomPic = profilePics[Math.floor(Math.random() * profilePics.length)];
+
 			const newComment = {
 				id: Date.now().toString(),
 				author: "You",
 				content: comment,
 				isAdvisor: role === "advisor",
+				profilePic: randomPic,
 			};
 
 			setComments([...comments, newComment]);
@@ -166,6 +365,9 @@ const ETFDetail = () => {
 						{sortedComments.map((c) => (
 							<div key={c.id} className="flex gap-3">
 								<Avatar className="w-10 h-10">
+									{c.profilePic && (
+										<AvatarImage src={c.profilePic} alt={c.author} />
+									)}
 									<AvatarFallback>{c.author[0]}</AvatarFallback>
 								</Avatar>
 								<div className="flex-1 space-y-1">
