@@ -2,6 +2,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ETF } from "@/types/personality";
 import { TrendingUp } from "lucide-react";
+import { useState, useEffect } from "react";
+import { getFundInfo, FundInfo } from "@/services/fundService";
 
 interface ETFCardProps {
   etf: ETF;
@@ -9,6 +11,19 @@ interface ETFCardProps {
 }
 
 const ETFCard = ({ etf, onClick }: ETFCardProps) => {
+  const [fundInfo, setFundInfo] = useState<FundInfo | null>(null);
+
+  // Fetch live NAV data for the card
+  useEffect(() => {
+    getFundInfo(etf.ticker)
+      .then((data) => {
+        setFundInfo(data);
+      })
+      .catch((error) => {
+        // Silently fail - will show static data
+        console.log(`Live data unavailable for ${etf.ticker}`);
+      });
+  }, [etf.ticker]);
   const personalityColor = etf.personalityMatch.includes("Long-Term")
     ? "hsl(var(--long-term))"
     : etf.personalityMatch.includes("Short-Term")
@@ -31,10 +46,22 @@ const ETFCard = ({ etf, onClick }: ETFCardProps) => {
               <TrendingUp className="w-4 h-4 text-muted-foreground" />
             </div>
             <p className="text-sm text-muted-foreground">{etf.name}</p>
+            {fundInfo?.nav && (
+              <p className="text-xs font-semibold" style={{ color: personalityColor }}>
+                NAV: ${fundInfo.nav.toFixed(2)}
+              </p>
+            )}
           </div>
-          <Badge variant="secondary" className="text-xs">
-            {etf.expenseRatio}% ER
-          </Badge>
+          <div className="text-right space-y-1">
+            <Badge variant="secondary" className="text-xs">
+              {etf.expenseRatio}% ER
+            </Badge>
+            {fundInfo?.totalReturn && (
+              <p className="text-xs text-muted-foreground">
+                Return: {fundInfo.totalReturn.toFixed(1)}
+              </p>
+            )}
+          </div>
         </div>
 
         <p className="text-sm line-clamp-2">{etf.description}</p>

@@ -6,12 +6,20 @@ import os
 from dotenv import load_dotenv
 import json
 from firebase_service import save_quiz_result
+from fund_service import get_fund_info, get_fund_nav, get_fund_holdings
+
+# Import MSTARPY_AVAILABLE for startup check
+try:
+    from fund_service import MSTARPY_AVAILABLE
+except ImportError:
+    MSTARPY_AVAILABLE = False
 
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-app = FastAPI()
+app = FastAPI(title="Financial Personality Quiz API")
 
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  
@@ -19,6 +27,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+async def startup_event():
+    print("=" * 50)
+    print("Backend server starting up...")
+    print(f"Gemini API configured: {bool(os.getenv('GEMINI_API_KEY'))}")
+    print(f"mstarpy available: {MSTARPY_AVAILABLE if 'MSTARPY_AVAILABLE' in globals() else 'Checking...'}")
+    print("=" * 50)
 
 # === Models ===
 
@@ -48,8 +64,34 @@ class QuizResultRequest(BaseModel):
 
 # === Endpoint ===
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "ok",
+        "gemini_configured": bool(os.getenv("GEMINI_API_KEY"))
+    }
+
 @app.post("/generate_investor_report")
 async def generate_investor_report(req: InvestorReportRequest):
+    print(f"\n[generate_investor_report] Request received for {req.personality.code}")
+    print(f"[generate_investor_report] Role: {req.role}")
+    
+    # Check if Gemini API key is configured
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if not gemini_key:
+        print("[generate_investor_report] ERROR: GEMINI_API_KEY not found")
+        return {
+            "error": "Gemini API key not configured",
+            "dimensions": {
+                "timeHorizon": {"dominantLabel": "Long-Term", "description": "AI analysis unavailable - API key not configured."},
+                "riskTolerance": {"dominantLabel": "Low Risk", "description": "AI analysis unavailable - API key not configured."},
+                "complexity": {"dominantLabel": "Simple", "description": "AI analysis unavailable - API key not configured."},
+                "consistency": {"dominantLabel": "Consistent", "description": "AI analysis unavailable - API key not configured."}
+            }
+        }
+    
+    print(f"[generate_investor_report] Gemini API key found, proceeding...")
 
     p = req.personality
     s = req.scores
@@ -132,10 +174,15 @@ Descriptions must be specific, behavioral, and investment-focused.
 Return ONLY valid JSON — no notes, no extra text.
 """
 
-    model = genai.GenerativeModel("gemini-2.5-flash-lite")
-    response = model.generate_content(prompt)
-
-    text = response.text
+    try:
+        model = genai.GenerativeModel("gemini-2.5-flash-lite")
+        print("[generate_investor_report] Calling Gemini API...")
+        response = model.generate_content(prompt)
+        text = response.text
+        print("[generate_investor_report] Gemini API response received")
+    except Exception as e:
+        print(f"[generate_investor_report] ERROR calling Gemini API: {e}")
+        raise
 
     # Log the raw model output for debugging
     print("[generate_investor_report] model output:")
@@ -160,6 +207,7 @@ Return ONLY valid JSON — no notes, no extra text.
     # If recovery failed, return a simple deterministic fallback so the UI
     # can still show useful content. Also keep the raw model output in the
     # returned structure under `raw` for debugging.
+    print("[generate_investor_report] JSON parsing failed, returning fallback")
     def dominant_label_from_pct(pct, labels):
       return labels[0] if pct < 50 else labels[1]
 
@@ -172,24 +220,25 @@ Return ONLY valid JSON — no notes, no extra text.
       "dimensions": {
         "timeHorizon": {
           "dominantLabel": dominant_label_from_pct(time_pct, ["Short-Term", "Long-Term"]),
-          "description": f"Fallback: {time_pct}% toward long-term vs short-term preferences. Use this as a placeholder while the AI response is being debugged."
+          "description": f"Your time horizon preference is {time_pct}% toward long-term planning. This suggests you prefer investments that compound over years rather than seeking quick returns. Consider strategies that align with your patient approach to wealth building."
         },
         "riskTolerance": {
           "dominantLabel": dominant_label_from_pct(risk_pct, ["High Risk", "Low Risk"]),
-          "description": f"Fallback: {risk_pct}% toward conservative vs risky preferences."
+          "description": f"Your risk tolerance is {risk_pct}% toward conservative strategies. This indicates you value stability and capital preservation. Focus on diversified portfolios that balance growth potential with downside protection."
         },
         "complexity": {
           "dominantLabel": dominant_label_from_pct(complexity_pct, ["Clarity", "Complex"]),
-          "description": f"Fallback: {complexity_pct}% toward complexity vs clarity preferences."
+          "description": f"Your preference for investment complexity is {complexity_pct}% toward simplicity. You likely prefer straightforward, easy-to-understand investment options that don't require deep financial knowledge."
         },
         "consistency": {
           "dominantLabel": dominant_label_from_pct(strategy_pct, ["Consistent Yield", "Lump Sum"]),
-          "description": f"Fallback: {strategy_pct}% toward lump-sum vs consistent strategies."
+          "description": f"Your investment style preference is {strategy_pct}% toward consistent strategies. You likely prefer regular, predictable returns through steady contributions rather than large one-time investments."
         }
       },
-      "raw": text
+      "raw": text[:500] if text else "No response from AI"
     }
 
+    print("[generate_investor_report] Returning fallback response")
     return fallback
 
 # === Quiz Results Endpoint ===
@@ -224,3 +273,50 @@ async def save_quiz_result_endpoint(req: QuizResultRequest):
             return {"success": False, "error": "Failed to save quiz result"}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+# === Fund Data Endpoints ===
+
+@app.get("/api/fund/{ticker}")
+async def get_fund(ticker: str):
+    """
+    Get comprehensive fund information including NAV, holdings, and historical data
+    """
+    print(f"[API] GET /api/fund/{ticker}")
+    try:
+        fund_info = get_fund_info(ticker.upper())
+        print(f"[API] Successfully returned fund info for {ticker}")
+        return fund_info
+    except Exception as e:
+        print(f"[API] Error getting fund info for {ticker}: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e), "ticker": ticker}
+
+@app.get("/api/fund/{ticker}/nav")
+async def get_fund_nav_endpoint(ticker: str, days: int = 30):
+    """
+    Get historical NAV data for a fund
+    """
+    print(f"[API] GET /api/fund/{ticker}/nav?days={days}")
+    try:
+        # Limit days to prevent timeouts
+        days = min(days, 90)  # Max 90 days
+        nav_data = get_fund_nav(ticker.upper(), days=days)
+        print(f"[API] Successfully returned {len(nav_data)} NAV points for {ticker}")
+        return {"ticker": ticker, "navData": nav_data}
+    except Exception as e:
+        print(f"[API] Error getting NAV for {ticker}: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e), "ticker": ticker, "navData": []}
+
+@app.get("/api/fund/{ticker}/holdings")
+async def get_fund_holdings_endpoint(ticker: str, limit: int = 10):
+    """
+    Get top holdings of a fund
+    """
+    try:
+        holdings = get_fund_holdings(ticker.upper(), limit=limit)
+        return {"ticker": ticker, "holdings": holdings}
+    except Exception as e:
+        return {"error": str(e), "ticker": ticker}

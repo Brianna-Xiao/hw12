@@ -5,11 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { mockETFs } from "@/data/mockETFs";
-import { ArrowLeft, Bookmark, TrendingUp } from "lucide-react";
+import { ArrowLeft, Bookmark, TrendingUp, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import Navigation from "@/components/Navigation";
 import { saveActivity } from "@/utils/activityStorage";
 import { useUser } from "@/contexts/UserContext";
+import { getFundInfo, getFundNav, FundInfo, FundHolding } from "@/services/fundService";
 import r1 from "@/assets/r1.jpeg";
 import y1 from "@/assets/y1.jpeg";
 import g1 from "@/assets/g1.jpeg";
@@ -216,8 +217,56 @@ const ETFDetail = () => {
 			profilePic?: string;
 		}>
 	>(initialComments[id || ""] || []);
+	const [fundInfo, setFundInfo] = useState<FundInfo | null>(null);
+	const [loadingFund, setLoadingFund] = useState(false);
 
 	const etf = mockETFs.find((e) => e.id === id);
+
+	// Fetch real fund data when component mounts - get more historical data for charts
+	useEffect(() => {
+		if (etf?.ticker) {
+			setLoadingFund(true);
+			console.log(`[ETFDetail] Fetching live data for ${etf.ticker}...`);
+			// Fetch comprehensive fund info with extended historical data
+			Promise.all([
+				getFundInfo(etf.ticker).catch(err => {
+					console.error(`[ETFDetail] Error fetching fund info:`, err);
+					return { error: err.message, ticker: etf.ticker };
+				}),
+				getFundNav(etf.ticker, 90).catch(err => {
+					console.error(`[ETFDetail] Error fetching NAV:`, err);
+					return [];
+				})
+			])
+				.then(([fundData, navData]) => {
+					console.log(`[ETFDetail] Fund data received:`, fundData);
+					console.log(`[ETFDetail] NAV data points:`, navData.length);
+					
+					// Merge the extended historical NAV data into fund info
+					if (navData && navData.length > 0) {
+						fundData.historicalNav = navData;
+					}
+					
+					// Always set fundInfo, even if there's an error, so we can show error messages
+					setFundInfo(fundData);
+				})
+				.catch((error) => {
+					console.error("[ETFDetail] Error loading fund data:", error);
+					setFundInfo({ 
+						error: error.message || "Failed to load fund data",
+						ticker: etf.ticker,
+						historicalNav: [],
+						holdings: [],
+						nav: null,
+						totalReturn: null,
+						lastUpdated: null
+					});
+				})
+				.finally(() => {
+					setLoadingFund(false);
+				});
+		}
+	}, [etf?.ticker]);
 
 	if (!etf) {
 		return (
@@ -292,7 +341,15 @@ const ETFDetail = () => {
 								<h1 className="text-4xl font-bold">{etf.ticker}</h1>
 								<TrendingUp className="w-6 h-6 text-muted-foreground" />
 							</div>
-							<p className="text-xl text-muted-foreground">{etf.name}</p>
+							<p className="text-xl text-muted-foreground">
+								{fundInfo?.name || etf.name}
+							</p>
+							{fundInfo?.nav && (
+								<p className="text-lg font-semibold" style={{ color: personalityColor }}>
+									NAV: ${fundInfo.nav.toFixed(2)}
+									{fundInfo.totalReturn && ` | Return: ${fundInfo.totalReturn.toFixed(2)}`}
+								</p>
+							)}
 						</div>
 						<Button variant="outline" size="icon" className="spring-press">
 							<Bookmark className="w-4 h-4" />
@@ -300,15 +357,76 @@ const ETFDetail = () => {
 					</div>
 
 					<div className="space-y-4">
+						{/* Real Fund Data from Morningstar */}
+						{loadingFund && (
+							<div className="flex items-center gap-2 text-muted-foreground">
+								<Loader2 className="w-4 h-4 animate-spin" />
+								<span>Loading live fund data...</span>
+							</div>
+						)}
+
+						{/* Description - use real data if available, otherwise fallback */}
 						<div>
 							<h3 className="font-semibold mb-2">Description</h3>
-							<p className="text-muted-foreground">{etf.description}</p>
+							<p className="text-muted-foreground">
+								{fundInfo?.description || etf.description}
+							</p>
 						</div>
 
-						<div className="grid grid-cols-2 gap-4">
+						{/* Live Fund Data - NAV and Total Return */}
+						{fundInfo && !fundInfo.error && fundInfo.nav && (
+							<div className="grid grid-cols-2 gap-4 border-t pt-4">
+								<div>
+									<h3 className="font-semibold mb-2">Current NAV</h3>
+									<p className="text-2xl font-bold">${fundInfo.nav.toFixed(2)}</p>
+									{fundInfo.lastUpdated && (
+										<p className="text-xs text-muted-foreground mt-1">
+											Updated: {fundInfo.lastUpdated}
+										</p>
+									)}
+								</div>
+								{fundInfo.totalReturn && (
+									<div>
+										<h3 className="font-semibold mb-2">Total Return</h3>
+										<p className="text-2xl font-bold">{fundInfo.totalReturn.toFixed(2)}</p>
+									</div>
+								)}
+							</div>
+						)}
+
+						{/* Top Holdings - Real Data */}
+						{fundInfo && !fundInfo.error && fundInfo.holdings && fundInfo.holdings.length > 0 && (
+							<div className="border-t pt-4">
+								<h3 className="font-semibold mb-3">Top Holdings</h3>
+								<div className="space-y-2">
+									{fundInfo.holdings.slice(0, 5).map((holding: FundHolding, index: number) => (
+										<div key={index} className="flex justify-between items-center p-2 bg-muted/30 rounded">
+											<div>
+												<p className="font-medium">{holding.ticker || holding.securityName}</p>
+												<p className="text-sm text-muted-foreground">
+													{holding.securityName || holding.ticker}
+												</p>
+											</div>
+											<p className="font-semibold">
+												{typeof holding.weighting === 'number' 
+													? `${holding.weighting.toFixed(2)}%`
+													: holding.weighting}
+											</p>
+										</div>
+									))}
+								</div>
+							</div>
+						)}
+
+						{/* Expense Ratio and Risk - show real data if available, otherwise fallback */}
+						<div className="grid grid-cols-2 gap-4 border-t pt-4">
 							<div>
 								<h3 className="font-semibold mb-2">Expense Ratio</h3>
-								<p className="text-2xl font-bold">{etf.expenseRatio}%</p>
+								<p className="text-2xl font-bold">
+									{fundInfo?.expenseRatio !== undefined && fundInfo.expenseRatio !== null
+										? `${fundInfo.expenseRatio}%` 
+										: `${etf.expenseRatio}%`}
+								</p>
 							</div>
 							<div>
 								<h3 className="font-semibold mb-2">Risk Level</h3>
@@ -321,20 +439,64 @@ const ETFDetail = () => {
 							</div>
 						</div>
 
-						<div>
-							<h3 className="font-semibold mb-2">5-Year Performance</h3>
-							<div className="h-32 flex items-end gap-1">
-								{etf.chartData?.map((value, index) => (
-									<div
-										key={index}
-										className="flex-1 rounded-t transition-all hover:opacity-80"
-										style={{
-											height: `${(value / 200) * 100}%`,
-											backgroundColor: personalityColor,
-										}}
-									/>
-								))}
+						{/* Show error message if data fetch failed */}
+						{fundInfo?.error && !loadingFund && (
+							<div className="text-sm text-muted-foreground border-t pt-4">
+								<p>⚠️ Live fund data unavailable. Showing static information.</p>
+								<p className="text-xs mt-1">Error: {fundInfo.error}</p>
 							</div>
+						)}
+
+						<div>
+							<h3 className="font-semibold mb-2">
+								{fundInfo?.historicalNav && fundInfo.historicalNav.length > 0 
+									? "Performance Chart (Live Data)" 
+									: "Performance Chart"}
+							</h3>
+							<div className="h-32 flex items-end gap-1">
+								{fundInfo?.historicalNav && fundInfo.historicalNav.length > 0 ? (
+									// Use real historical NAV data - show all available data points
+									fundInfo.historicalNav.map((nav, index) => {
+										const maxNav = Math.max(...fundInfo.historicalNav.map(n => n.nav));
+										const minNav = Math.min(...fundInfo.historicalNav.map(n => n.nav));
+										const height = maxNav > minNav 
+											? ((nav.nav - minNav) / (maxNav - minNav)) * 100 
+											: 50;
+										return (
+											<div
+												key={index}
+												className="flex-1 rounded-t transition-all hover:opacity-80 cursor-pointer"
+												style={{
+													height: `${height}%`,
+													backgroundColor: personalityColor,
+												}}
+												title={`NAV: $${nav.nav.toFixed(2)} | Total Return: ${nav.totalReturn.toFixed(2)} | Date: ${nav.date}`}
+											/>
+										);
+									})
+								) : (
+									// Fallback to hardcoded data if live data unavailable
+									etf.chartData?.map((value, index) => (
+										<div
+											key={index}
+											className="flex-1 rounded-t transition-all hover:opacity-80"
+											style={{
+												height: `${(value / 200) * 100}%`,
+												backgroundColor: personalityColor,
+											}}
+										/>
+									))
+								)}
+							</div>
+							{fundInfo?.historicalNav && fundInfo.historicalNav.length > 0 ? (
+								<p className="text-xs text-muted-foreground mt-2">
+									Live data: {fundInfo.historicalNav.length} data points from {fundInfo.historicalNav[0]?.date} to {fundInfo.historicalNav[fundInfo.historicalNav.length - 1]?.date}
+								</p>
+							) : (
+								<p className="text-xs text-muted-foreground mt-2">
+									Using sample data. Live data unavailable.
+								</p>
+							)}
 						</div>
 
 						<div>
