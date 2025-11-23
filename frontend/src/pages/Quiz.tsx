@@ -7,6 +7,8 @@ import QuizQuestion from "@/components/QuizQuestion";
 import { quizQuestions, advisorQuestions } from "@/data/quizQuestions";
 import { useUser } from "@/contexts/UserContext";
 import { calculatePersonalityScores, getPersonalityType } from "@/utils/personalityCalculator";
+import { saveQuizResults, getUserId } from "@/services/firebaseService";
+import { toast } from "sonner";
 
 const Quiz = () => {
 	const navigate = useNavigate();
@@ -40,7 +42,7 @@ const Quiz = () => {
 		addQuizAnswer({ questionIndex, value });
 	};
 
-	const handleSubmit = () => {
+	const handleSubmit = async () => {
 		const allAnswers = Object.entries(currentAnswers).map(([index, value]) => ({
 			questionIndex: parseInt(index),
 			value,
@@ -51,7 +53,28 @@ const Quiz = () => {
 
 		setPersonalityScores(scores);
 		setPersonalityType(type);
+
+		// Navigate immediately - don't wait for Firebase
 		navigate("/results");
+
+		// Save to Firebase in the background (non-blocking)
+		if (!role) {
+			console.error("Role is required to save quiz results");
+			return;
+		}
+
+		// Save asynchronously without blocking navigation
+		saveQuizResults(getUserId(), role, allAnswers, scores, type)
+			.then(() => {
+				console.log("Quiz results saved to Firebase successfully");
+				// Optionally show a subtle notification
+				toast.success("Results saved", { duration: 2000 });
+			})
+			.catch((error) => {
+				console.error("Failed to save quiz results to Firebase:", error);
+				// Don't show error toast - save failed silently in background
+				// User already navigated away, so they don't need to see this
+			});
 	};
 
 	const answeredCount = Object.keys(currentAnswers).length;

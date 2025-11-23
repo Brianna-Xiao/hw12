@@ -5,6 +5,7 @@ import google.generativeai as genai
 import os
 from dotenv import load_dotenv
 import json
+from firebase_service import save_quiz_result
 
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
@@ -25,6 +26,7 @@ class PersonalityType(BaseModel):
     code: str
     name: str
     description: str
+    color: str = "#4398b4"  # Default color if not provided
 
 class PersonalityScores(BaseModel):
     shortTermVsLongTerm: float
@@ -36,6 +38,13 @@ class InvestorReportRequest(BaseModel):
     personality: PersonalityType
     scores: PersonalityScores
     role: str
+
+class QuizResultRequest(BaseModel):
+    userId: str
+    role: str
+    quizAnswers: list
+    personalityScores: PersonalityScores
+    personalityType: PersonalityType
 
 # === Endpoint ===
 
@@ -182,3 +191,36 @@ Return ONLY valid JSON — no notes, no extra text.
     }
 
     return fallback
+
+# === Quiz Results Endpoint ===
+
+@app.post("/save_quiz_result")
+async def save_quiz_result_endpoint(req: QuizResultRequest):
+    """
+    Save quiz results to Firebase
+    """
+    try:
+        doc_id = save_quiz_result(
+            user_id=req.userId,
+            role=req.role,
+            quiz_answers=req.quizAnswers,
+            personality_scores={
+                "shortTermVsLongTerm": req.personalityScores.shortTermVsLongTerm,
+                "highRiskVsLowRisk": req.personalityScores.highRiskVsLowRisk,
+                "clarityVsComplexity": req.personalityScores.clarityVsComplexity,
+                "consistentVsLumpSum": req.personalityScores.consistentVsLumpSum,
+            },
+            personality_type={
+                "code": req.personalityType.code,
+                "name": req.personalityType.name,
+                "description": req.personalityType.description,
+                "color": req.personalityType.color,
+            }
+        )
+        
+        if doc_id:
+            return {"success": True, "documentId": doc_id}
+        else:
+            return {"success": False, "error": "Failed to save quiz result"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
