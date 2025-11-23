@@ -7,9 +7,13 @@ import { mockETFs } from "@/data/mockETFs";
 import { useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import { Card } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import r1 from "@/assets/r1.jpeg";
+import y1 from "@/assets/y1.jpeg";
+import g1 from "@/assets/g1.jpeg";
+import b1 from "@/assets/b1.jpeg";
 
 const Invest = () => {
 	const [searchQuery, setSearchQuery] = useState("");
@@ -20,6 +24,7 @@ const Invest = () => {
 			user: "Sarah Chen",
 			personality: "SP",
 			personalityColor: "hsl(var(--long-term))",
+			profilePic: b1,
 			isAdvisor: true,
 			etf: "VOO",
 			etfName: "Vanguard S&P 500",
@@ -40,6 +45,7 @@ const Invest = () => {
 			user: "Alexandra Kim",
 			personality: "RC",
 			personalityColor: "hsl(var(--high-risk))",
+			profilePic: r1,
 			isAdvisor: false,
 			etf: "ARKK",
 			etfName: "ARK Innovation ETF",
@@ -53,6 +59,7 @@ const Invest = () => {
 			user: "Jordan Williams",
 			personality: "DC",
 			personalityColor: "hsl(var(--low-risk))",
+			profilePic: g1,
 			isAdvisor: true,
 			etf: "SCHD",
 			etfName: "Schwab US Dividend Equity",
@@ -73,6 +80,7 @@ const Invest = () => {
 			user: "Priya Sharma",
 			personality: "SI",
 			personalityColor: "hsl(var(--primary))",
+			profilePic: b1,
 			isAdvisor: false,
 			etf: "VTI",
 			etfName: "Vanguard Total Stock Market",
@@ -93,6 +101,7 @@ const Invest = () => {
 			user: "Aisha Patel",
 			personality: "RA",
 			personalityColor: "hsl(var(--high-risk))",
+			profilePic: r1,
 			isAdvisor: true,
 			etf: "QQQ",
 			etfName: "Invesco QQQ Trust",
@@ -106,6 +115,7 @@ const Invest = () => {
 			user: "Isabella Martinez",
 			personality: "SP",
 			personalityColor: "hsl(var(--long-term))",
+			profilePic: b1,
 			isAdvisor: false,
 			etf: "BND",
 			etfName: "Vanguard Total Bond Market",
@@ -132,6 +142,7 @@ const Invest = () => {
 			user: "Fatima Hassan",
 			personality: "DI",
 			personalityColor: "hsl(var(--low-risk))",
+			profilePic: g1,
 			isAdvisor: false,
 			etf: "VIG",
 			etfName: "Vanguard Dividend Appreciation",
@@ -234,6 +245,7 @@ const Invest = () => {
 								{/* Header */}
 								<div className="flex items-start gap-3">
 									<Avatar className="w-10 h-10">
+										<AvatarImage src={review.profilePic} alt={review.user} />
 										<AvatarFallback>{review.user[0]}</AvatarFallback>
 									</Avatar>
 									<div className="flex-1">
