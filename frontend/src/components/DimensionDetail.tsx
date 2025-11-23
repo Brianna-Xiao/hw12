@@ -1,6 +1,4 @@
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
 
 interface DimensionDetailProps {
   title: string;
@@ -8,10 +6,9 @@ interface DimensionDetailProps {
   dominantLabel: string;
   color: string;
   description: string;
-  illustration?: React.ReactNode;
 }
 
-const DimensionDetail = ({ title, percentage, dominantLabel, color, description, illustration }: DimensionDetailProps) => {
+const DimensionDetail = ({ title, percentage, dominantLabel, color, description }: DimensionDetailProps) => {
   return (
     <Card className="p-6 space-y-6 shadow-elevated h-full">
       <div className="space-y-2">
@@ -24,24 +21,9 @@ const DimensionDetail = ({ title, percentage, dominantLabel, color, description,
         </p>
       </div>
 
-      {illustration && (
-        <div className="flex items-center justify-center min-h-[200px] bg-muted/30 rounded-lg">
-          {illustration}
-        </div>
-      )}
-
       <p className="text-muted-foreground leading-relaxed">
         {description}
       </p>
-
-      <Button 
-        variant="link" 
-        className="p-0 h-auto font-semibold"
-        style={{ color: color }}
-      >
-        LEARN MORE
-        <ArrowRight className="ml-2 w-4 h-4" />
-      </Button>
     </Card>
   );
 };

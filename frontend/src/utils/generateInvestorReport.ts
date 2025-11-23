@@ -1,9 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
 import { PersonalityScores, PersonalityType } from "@/types/personality";
-
-const ai = new GoogleGenAI({
-  apiKey: import.meta.env.GEMINI_API_KEY,
-});
 
 export type InvestorReport = {
   strengths: string[];
@@ -37,66 +32,29 @@ export async function generateInvestorReport(
   role: string
 ): Promise<InvestorReport> {
 
-  const prompt = `
-Generate a structured investor personality report based on the following data.
-
-### Personality Code
-${personality.code} — ${personality.name}
-
-### Description
-${personality.description}
-
-### Raw Axis Scores:
-- Time Horizon (Short → Long): ${scores.shortTermVsLongTerm}
-- Risk Tolerance (Risky → Conservative): ${scores.highRiskVsLowRisk}
-- Complexity Preference (Simple → Complex): ${scores.clarityVsComplexity}
-- Strategy Preference (Gradual → Lump Sum): ${scores.consistentVsLumpSum}
-
-### User Role
-${role}
-
-### REQUIRED JSON FORMAT (no markdown):
-
-{
-  "strengths": [],
-  "weaknesses": [],
-  "strategies": [],
-  "behaviors": [],
-  "advisorTips": [],
-  "dimensions": {
-    "timeHorizon": {
-      "dominantLabel": "",
-      "description": ""
+  const res = await fetch("http://localhost:8000/generate_investor_report", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
     },
-    "riskTolerance": {
-      "dominantLabel": "",
-      "description": ""
-    },
-    "complexity": {
-      "dominantLabel": "",
-      "description": ""
-    },
-    "consistency": {
-      "dominantLabel": "",
-      "description": ""
-    }
-  }
-}
-
-Return ONLY valid JSON.
-`;
-
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-lite",
-    contents: prompt,
+    body: JSON.stringify({
+      personality,
+      scores,
+      role,
+    }),
   });
 
-  const text = response.text;
-
-  try {
-    return JSON.parse(text);
-  } catch (e) {
-    console.error("Invalid JSON from Gemini:", text);
-    throw new Error("Gemini returned invalid JSON");
+  if (!res.ok) {
+    throw new Error("Backend error: " + res.statusText);
   }
+
+  const data = await res.json();
+
+  console.log("Received investor report data:", data);
+
+  if (data.error) {
+    throw new Error("Gemini JSON error: " + data.error);
+  }
+
+  return data as InvestorReport;
 }

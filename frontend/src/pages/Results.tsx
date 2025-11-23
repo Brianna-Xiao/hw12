@@ -7,7 +7,6 @@ import { useUser } from "@/contexts/UserContext";
 import { getPercentages } from "@/utils/personalityCalculator";
 import PersonalityBar from "@/components/PersonalityBar";
 import DimensionDetail from "@/components/DimensionDetail";
-import { Users, TrendingUp, BarChart3, Target } from "lucide-react";
 import { generateInvestorReport, InvestorReport } from "@/utils/generateInvestorReport";
 
 const Results = () => {
@@ -24,7 +23,9 @@ const Results = () => {
     (async () => {
       setLoadingReport(true);
       try {
+        // send the raw personality scores object to the backend (matches expected type)
         const result = await generateInvestorReport(personalityType, personalityScores, role);
+
         setReport(result);
       } catch (err) {
         console.error("AI error:", err);
@@ -40,47 +41,60 @@ const Results = () => {
   const percentages = getPercentages(personalityScores);
 
   const getAIDimensionDetail = (dimension: keyof InvestorReport["dimensions"]) => {
-  if (!report) return null;
+    // Provide graceful fallbacks so the UI works even if the AI report hasn't loaded or errored.
+    const title =
+      dimension === "timeHorizon"
+        ? "Time Horizon"
+        : dimension === "riskTolerance"
+        ? "Risk Tolerance"
+        : dimension === "complexity"
+        ? "Investment Complexity"
+        : "Investment Style";
 
-    return {
-      title:
-        dimension === "timeHorizon"
-          ? "Time Horizon"
-          : dimension === "riskTolerance"
-          ? "Risk Tolerance"
-          : dimension === "complexity"
-          ? "Investment Complexity"
-          : "Investment Style",
+    const percentage =
+      dimension === "timeHorizon"
+        ? percentages.longTerm
+        : dimension === "riskTolerance"
+        ? percentages.lowRisk
+        : dimension === "complexity"
+        ? percentages.complexity
+        : percentages.lumpSum;
 
-      percentage:
-        dimension === "timeHorizon"
-          ? percentages.longTerm
-          : dimension === "riskTolerance"
-          ? percentages.lowRisk
-          : dimension === "complexity"
-          ? percentages.complexity
-          : percentages.lumpSum,
+    // If report exists use AI values, otherwise derive a sensible dominant label from the local percentages
+    const dominantLabel = report
+      ? report.dimensions[dimension].dominantLabel
+      : dimension === "timeHorizon"
+      ? percentage >= 50
+        ? "Long-Term"
+        : "Short-Term"
+      : dimension === "riskTolerance"
+      ? percentage >= 50
+        ? "Low Risk"
+        : "High Risk"
+      : dimension === "complexity"
+      ? percentage >= 50
+        ? "Complex"
+        : "Clarity"
+      : percentage >= 50
+      ? "Lump Sum"
+      : "Consistent Yield";
 
-      dominantLabel: report.dimensions[dimension].dominantLabel,
-      description: report.dimensions[dimension].description,
-      color:
-        dimension === "timeHorizon"
-          ? "#4398b4"
-          : dimension === "riskTolerance"
-          ? "#e4ae3a"
-          : dimension === "complexity"
-          ? "#33a474"
-          : "#f25e62",
+    const description = report
+      ? report.dimensions[dimension].description
+      : loadingReport
+      ? "AI report loading..."
+      : "AI report unavailable. Try again later.";
 
-      illustration:
-        dimension === "timeHorizon"
-          ? <Users className="w-32 h-32 text-muted-foreground/20" />
-          : dimension === "riskTolerance"
-          ? <TrendingUp className="w-32 h-32 text-muted-foreground/20" />
-          : dimension === "complexity"
-          ? <BarChart3 className="w-32 h-32 text-muted-foreground/20" />
-          : <Target className="w-32 h-32 text-muted-foreground/20" />,
-    };
+    const color =
+      dimension === "timeHorizon"
+        ? "#4398b4"
+        : dimension === "riskTolerance"
+        ? "#e4ae3a"
+        : dimension === "complexity"
+        ? "#33a474"
+        : "#f25e62";
+
+    return { title, percentage, dominantLabel, description, color };
   };
 
   const currentDetail = hoveredDimension ? getAIDimensionDetail(hoveredDimension) : null;
@@ -168,7 +182,6 @@ const Results = () => {
                 dominantLabel={currentDetail.dominantLabel}
                 color={currentDetail.color}
                 description={currentDetail.description}
-                illustration={currentDetail.illustration}
               />
             ) : (
               <Card className="p-6 space-y-6 shadow-elevated h-full flex items-center justify-center min-h-[500px]">
