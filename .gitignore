@@ -31,3 +31,7 @@ dist-ssr
 *.png
 *.gif
 *.svg
+
+__pycache__/
+*.pyc
+*__pycache__*/

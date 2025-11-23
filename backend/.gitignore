@@ -30,3 +30,10 @@ firebase-service-account.json
 *.sln
 *.sw?
 *.jpeg
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
