@@ -2,154 +2,201 @@ import { QuizAnswer, PersonalityScores, PersonalityType } from "@/types/personal
 import { quizQuestions } from "@/data/quizQuestions";
 
 export function calculatePersonalityScores(answers: QuizAnswer[]): PersonalityScores {
-  const scores = {
-    shortTermVsLongTerm: 0,
-    highRiskVsLowRisk: 0,
-    clarityVsComplexity: 0,
-    consistentVsLumpSum: 0,
-  };
+	const scores = {
+		shortTermVsLongTerm: 0,
+		highRiskVsLowRisk: 0,
+		clarityVsComplexity: 0,
+		consistentVsLumpSum: 0,
+	};
 
-  answers.forEach((answer) => {
-    const question = quizQuestions[answer.questionIndex];
-    // Convert 1-7 scale to -3 to +3
-    let score = answer.value - 4;
-    
-    // Reverse if needed
-    if (question.reverse) {
-      score = -score;
-    }
+	answers.forEach((answer) => {
+		const question = quizQuestions[answer.questionIndex];
+		// Convert 1-7 scale to -3 to +3
+		let score = answer.value - 4;
 
-    switch (question.axis) {
-      case "timeHorizon":
-        scores.shortTermVsLongTerm += score;
-        break;
-      case "riskTolerance":
-        scores.highRiskVsLowRisk += score;
-        break;
-      case "complexity":
-        scores.clarityVsComplexity += score;
-        break;
-      case "consistency":
-        scores.consistentVsLumpSum += score;
-        break;
-    }
-  });
+		// Reverse if needed
+		if (question.reverse) {
+			score = -score;
+		}
 
-  return scores;
+		switch (question.axis) {
+			case "timeHorizon":
+				scores.shortTermVsLongTerm += score;
+				break;
+			case "riskTolerance":
+				scores.highRiskVsLowRisk += score;
+				break;
+			case "complexity":
+				scores.clarityVsComplexity += score;
+				break;
+			case "consistency":
+				scores.consistentVsLumpSum += score;
+				break;
+		}
+	});
+
+	return scores;
 }
 
 export function getPersonalityType(scores: PersonalityScores): PersonalityType {
-  // Generate 4-letter code
-  const timeCode = scores.shortTermVsLongTerm >= 0 ? "L" : "S"; // Long-term vs Short-term
-  const riskCode = scores.highRiskVsLowRisk >= 0 ? "C" : "R"; // Conservative vs Risky
-  const complexityCode = scores.clarityVsComplexity >= 0 ? "X" : "I"; // compleX vs sImple
-  const consistencyCode = scores.consistentVsLumpSum >= 0 ? "B" : "G"; // Big wins vs Gradual
+	// Generate 4-letter code based on new criteria
+	// First letter: L (Long-term) or S (Short-term)
+	const timeCode = scores.shortTermVsLongTerm >= 0 ? "L" : "S";
 
-  const code = `${timeCode}${riskCode}${complexityCode}${consistencyCode}`;
+	// Second letter: H (High-risk) or R (Low-risk)
+	const riskCode = scores.highRiskVsLowRisk >= 0 ? "R" : "H";
 
-  // Determine dominant axis and color
-  const maxScore = Math.max(
-    Math.abs(scores.shortTermVsLongTerm),
-    Math.abs(scores.highRiskVsLowRisk),
-    Math.abs(scores.clarityVsComplexity),
-    Math.abs(scores.consistentVsLumpSum)
-  );
+	// Third letter: C (Complex) or X (Clarity/Simple)
+	const complexityCode = scores.clarityVsComplexity >= 0 ? "C" : "X";
 
-  let color = "hsl(var(--primary))";
-  if (Math.abs(scores.shortTermVsLongTerm) === maxScore) {
-    color = scores.shortTermVsLongTerm >= 0 ? "hsl(var(--long-term))" : "hsl(var(--short-term))";
-  } else if (Math.abs(scores.highRiskVsLowRisk) === maxScore) {
-    color = scores.highRiskVsLowRisk >= 0 ? "hsl(var(--low-risk))" : "hsl(var(--high-risk))";
-  }
+	// Fourth letter: W (Windfall) or C (Consistent yield)
+	const consistencyCode = scores.consistentVsLumpSum >= 0 ? "W" : "C";
+	const code = `${timeCode}${riskCode}${complexityCode}${consistencyCode}`;
 
-  const personalityTypes: Record<string, { name: string; description: string }> = {
-    LRIG: {
-      name: "The Steady Builder",
-      description: "You value long-term, conservative strategies with simple approaches and gradual growth. You're patient and prefer to minimize risk while building wealth steadily over time.",
-    },
-    LRIB: {
-      name: "The Strategic Planner",
-      description: "Long-term and risk-averse, you prefer simple strategies that lead to significant milestones. You value patience and security while working toward major financial goals.",
-    },
-    LRXG: {
-      name: "The Complex Accumulator",
-      description: "You enjoy understanding intricate financial systems and prefer conservative, long-term strategies with steady growth. Details matter to you.",
-    },
-    LRXB: {
-      name: "The Methodical Architect",
-      description: "Patient and detail-oriented, you build complex long-term strategies aimed at big payoffs. You're comfortable with sophisticated approaches as long as risk is managed.",
-    },
-    LCIG: {
-      name: "The Balanced Grower",
-      description: "You prefer simplicity and consistency in your conservative long-term approach. Regular, predictable progress keeps you motivated.",
-    },
-    LCIB: {
-      name: "The Patient Achiever",
-      description: "Simple and conservative with a long-term view, you work toward major milestones. You value clarity and security on your financial journey.",
-    },
-    LCXG: {
-      name: "The Sophisticated Stabilizer",
-      description: "You appreciate complex strategies that deliver steady, reliable results over the long term. You're conservative but intellectually engaged.",
-    },
-    LCXB: {
-      name: "The Masterful Strategist",
-      description: "You design intricate, conservative long-term plans aimed at significant achievements. Patience, complexity, and security define your approach.",
-    },
-    SRIG: {
-      name: "The Quick Builder",
-      description: "You like seeing results soon with simple, relatively safe approaches that provide steady feedback. Short-term wins keep you motivated.",
-    },
-    SRIB: {
-      name: "The Tactical Opportunist",
-      description: "You're open to quick wins through simple strategies that can yield bigger payoffs, even if it means waiting a bit. You balance speed with caution.",
-    },
-    SRXG: {
-      name: "The Analytical Trader",
-      description: "You enjoy diving into complex strategies for short-term gains with measured risk. Details and steady progress excite you.",
-    },
-    SRXB: {
-      name: "The Technical Gambler",
-      description: "Complex short-term strategies with potential for bigger payoffs appeal to you. You're willing to study the details for calculated risks.",
-    },
-    SCIG: {
-      name: "The Conservative Sprint",
-      description: "You prefer simple, low-risk approaches that deliver regular short-term returns. Predictable progress in the near term suits you best.",
-    },
-    SCIB: {
-      name: "The Cautious Climber",
-      description: "Simple and conservative, you look for short-term opportunities that can lead to notable gains. You balance safety with the need for results.",
-    },
-    SCXG: {
-      name: "The Detail-Oriented Planner",
-      description: "You like sophisticated strategies that produce steady short-term results. Complexity doesn't intimidate you as long as risk is managed.",
-    },
-    SCXB: {
-      name: "The Calculated Innovator",
-      description: "Complex and conservative, you seek short-term strategies that can yield significant returns. You balance sophistication with prudence.",
-    },
-  };
+	// Determine color based on first two letters (group)
+	let color = "hsl(var(--primary))";
+	let groupName = "";
 
-  const typeInfo = personalityTypes[code] || {
-    name: "The Financial Explorer",
-    description: "Your unique combination of traits makes you adaptable and open to various financial strategies.",
-  };
+	if (timeCode === "L" && riskCode === "H") {
+		// RED Group = "Bold" (Long-term + High-risk)
+		color = "hsl(var(--high-risk))"; // #f25e62
+		groupName = "Bold";
+	} else if (timeCode === "S" && riskCode === "H") {
+		// YELLOW Group = "Fast" (Short-term + High-risk)
+		color = "hsl(var(--short-term))"; // #e2ad3a
+		groupName = "Fast";
+	} else if (timeCode === "S" && riskCode === "R") {
+		// GREEN Group = "Safe" (Short-term + Low-risk)
+		color = "hsl(var(--low-risk))"; // #33a474
+		groupName = "Safe";
+	} else if (timeCode === "L" && riskCode === "R") {
+		// BLUE Group = "Steady" (Long-term + Low-risk)
+		color = "hsl(var(--long-term))"; // #4398b4
+		groupName = "Steady";
+	}
 
-  return {
-    code,
-    name: typeInfo.name,
-    description: typeInfo.description,
-    color,
-  };
+	const personalityTypes: Record<string, { name: string; description: string }> = {
+		// 🔴 RED Group = "Bold" (Long-term + High-risk)
+		LHCC: {
+			name: "The Visionary Builder",
+			description:
+				"Bold and patient, you embrace complex long-term strategies with consistent returns. You're willing to take risks to build something significant over time.",
+		},
+		LHCW: {
+			name: "The Empire Architect",
+			description:
+				"You design intricate, ambitious long-term plans aimed at major windfalls. Risk doesn't intimidate you when there's potential for transformative gains.",
+		},
+		LHXC: {
+			name: "The Steady Pioneer",
+			description:
+				"You prefer clear, bold long-term strategies that deliver regular progress. Simple approaches with high upside appeal to your patient yet daring nature.",
+		},
+		LHXW: {
+			name: "The Strategic Gambler",
+			description:
+				"Simple yet bold, you target significant long-term windfalls. You're comfortable with risk and prefer straightforward approaches to major milestones.",
+		},
+
+		// 🟡 YELLOW Group = "Fast" (Short-term + High-risk)
+		SHCC: {
+			name: "The Dynamic Trader",
+			description:
+				"Fast-paced and analytical, you thrive on complex short-term strategies with consistent action. You enjoy the thrill of frequent, calculated risks.",
+		},
+		SHCW: {
+			name: "The Aggressive Speculator",
+			description:
+				"You pursue complex short-term opportunities for major quick windfalls. High risk and high reward excite you when backed by sophisticated analysis.",
+		},
+		SHXC: {
+			name: "The Quick Mover",
+			description:
+				"Simple and fast, you prefer clear short-term plays with regular opportunities. Speed and simplicity drive your bold decisions.",
+		},
+		SHXW: {
+			name: "The Momentum Chaser",
+			description:
+				"You seek straightforward short-term opportunities for big, fast windfalls. Risk is acceptable when the potential payoff comes quickly.",
+		},
+
+		// 🟢 GREEN Group = "Safe" (Short-term + Low-risk)
+		SRCC: {
+			name: "The Prudent Tactician",
+			description:
+				"You favor complex but safe short-term strategies with steady results. Security and sophistication guide your near-term decisions.",
+		},
+		SRCW: {
+			name: "The Careful Opportunist",
+			description:
+				"Conservative yet tactical, you seek complex short-term strategies for notable but secure windfalls. You balance safety with targeted opportunities.",
+		},
+		SRXC: {
+			name: "The Safe Sprinter",
+			description:
+				"Simple and secure, you prefer clear short-term approaches with regular, predictable returns. Safety and consistency are your priorities.",
+		},
+		SRXW: {
+			name: "The Conservative Achiever",
+			description:
+				"You look for straightforward, low-risk short-term opportunities that can yield meaningful windfalls. Security meets ambition in your approach.",
+		},
+
+		// 🔵 BLUE Group = "Steady" (Long-term + Low-risk)
+		LRCC: {
+			name: "The Patient Analyst",
+			description:
+				"You build complex, secure long-term strategies with consistent returns. Sophistication and safety define your patient approach to wealth building.",
+		},
+		LRCW: {
+			name: "The Methodical Planner",
+			description:
+				"Complex and conservative, you design long-term strategies for significant secure windfalls. You value both sophistication and stability.",
+		},
+		LRXC: {
+			name: "The Steady Builder",
+			description:
+				"Simple and secure, you prefer clear long-term approaches with regular progress. Patience, safety, and consistency are your foundation.",
+		},
+		LRXW: {
+			name: "The Reliable Achiever",
+			description:
+				"Straightforward and patient, you work toward major long-term windfalls with minimal risk. Clarity and security guide your journey to success.",
+		},
+	};
+
+	const typeInfo = personalityTypes[code] || {
+		name: "The Financial Explorer",
+		description:
+			"Your unique combination of traits makes you adaptable and open to various financial strategies.",
+	};
+
+	return {
+		code,
+		name: typeInfo.name,
+		description: typeInfo.description,
+		color,
+		group: groupName,
+	};
 }
 
 export function getPercentages(scores: PersonalityScores) {
-  // Convert scores to percentages (0-100)
-  const maxPossible = 15; // 5 questions per axis * 3 max points
-  
-  return {
-    longTerm: Math.round(((scores.shortTermVsLongTerm + maxPossible) / (maxPossible * 2)) * 100),
-    lowRisk: Math.round(((scores.highRiskVsLowRisk + maxPossible) / (maxPossible * 2)) * 100),
-    complexity: Math.round(((scores.clarityVsComplexity + maxPossible) / (maxPossible * 2)) * 100),
-    lumpSum: Math.round(((scores.consistentVsLumpSum + maxPossible) / (maxPossible * 2)) * 100),
-  };
+	// Convert scores to percentages (0-100)
+	const maxPossible = 15; // 5 questions per axis * 3 max points
+
+	const calculatePercentage = (score: number) => {
+		let percentage = Math.round(((score + maxPossible) / (maxPossible * 2)) * 100);
+		// Prevent exactly 50% - tip it to 51%
+		if (percentage === 50) {
+			percentage = 51;
+		}
+		return percentage;
+	};
+
+	return {
+		longTerm: calculatePercentage(scores.shortTermVsLongTerm),
+		lowRisk: calculatePercentage(scores.highRiskVsLowRisk),
+		complexity: calculatePercentage(scores.clarityVsComplexity),
+		windfall: calculatePercentage(scores.consistentVsLumpSum),
+	};
 }
