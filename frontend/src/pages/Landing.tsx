@@ -17,7 +17,7 @@ const Landing = () => {
         </h1>
         
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-          Take our MBTI-inspired quiz to understand your investment style, connect with like-minded investors, and find ETFs that match your personality.
+          Discover yourself. Grow your wealth.
         </p>
 
         <Button
