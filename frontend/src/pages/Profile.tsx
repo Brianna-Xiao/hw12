@@ -19,26 +19,19 @@ import { useUser } from "@/contexts/UserContext";
 import Navigation from "@/components/Navigation";
 import { TrendingUp, Users, Pencil } from "lucide-react";
 import { getActivities, Activity, clearActivities } from "@/utils/activityStorage";
+import { saveUserProfile, getUserProfile, deleteUserProfile, getUserId } from "@/services/firebaseService";
+import { toast } from "sonner";
 
 const Profile = () => {
 	const navigate = useNavigate();
-	const { personalityType, role } = useUser();
+	const { personalityType, role, personalityScores } = useUser();
 	const [isEditOpen, setIsEditOpen] = useState(false);
-	const [name, setName] = useState(() => {
-		return localStorage.getItem("profileName") || "Your Name";
-	});
-	const [pronouns, setPronouns] = useState(() => {
-		return localStorage.getItem("profilePronouns") || "they/them";
-	});
-	const [bio, setBio] = useState(() => {
-		return (
-			localStorage.getItem("profileBio") ||
-			"Building wealth through thoughtful, personality-driven investment strategies."
-		);
-	});
-	const [profilePic, setProfilePic] = useState<string | null>(() => {
-		return localStorage.getItem("profilePic") || null;
-	});
+	const [isLoading, setIsLoading] = useState(true);
+	const [isSaving, setIsSaving] = useState(false);
+	const [name, setName] = useState("Your Name");
+	const [pronouns, setPronouns] = useState("they/them");
+	const [bio, setBio] = useState("Building wealth through thoughtful, personality-driven investment strategies.");
+	const [profilePic, setProfilePic] = useState<string | null>(null);
 	const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
 
 	useEffect(() => {
@@ -52,28 +45,157 @@ const Profile = () => {
 		setRecentActivities(getActivities());
 	}, []);
 
-	const handleSave = () => {
-		localStorage.setItem("profileName", name);
-		localStorage.setItem("profilePronouns", pronouns);
-		localStorage.setItem("profileBio", bio);
-		if (profilePic) {
-			localStorage.setItem("profilePic", profilePic);
+	// Load profile from Firebase on mount
+	useEffect(() => {
+		const loadProfile = async () => {
+			if (!personalityType || !role) return;
+
+			setIsLoading(true);
+			try {
+				const userId = getUserId();
+				const profile = await getUserProfile(userId);
+
+				if (profile) {
+					// Load from Firebase
+					setName(profile.name || "Your Name");
+					setPronouns(profile.pronouns || "they/them");
+					setBio(profile.bio || "Building wealth through thoughtful, personality-driven investment strategies.");
+					setProfilePic(profile.avatar || null);
+
+					// Also update localStorage as cache
+					localStorage.setItem("profileName", profile.name || "Your Name");
+					localStorage.setItem("profilePronouns", profile.pronouns || "they/them");
+					localStorage.setItem("profileBio", profile.bio || "Building wealth through thoughtful, personality-driven investment strategies.");
+					if (profile.avatar) {
+						localStorage.setItem("profilePic", profile.avatar);
+					}
+				} else {
+					// Fallback to localStorage if no Firebase profile exists
+					const cachedName = localStorage.getItem("profileName");
+					const cachedPronouns = localStorage.getItem("profilePronouns");
+					const cachedBio = localStorage.getItem("profileBio");
+					const cachedPic = localStorage.getItem("profilePic");
+
+					if (cachedName) setName(cachedName);
+					if (cachedPronouns) setPronouns(cachedPronouns);
+					if (cachedBio) setBio(cachedBio);
+					if (cachedPic) setProfilePic(cachedPic);
+				}
+			} catch (error) {
+				console.error("Error loading profile from Firebase:", error);
+				// Fallback to localStorage
+				const cachedName = localStorage.getItem("profileName");
+				const cachedPronouns = localStorage.getItem("profilePronouns");
+				const cachedBio = localStorage.getItem("profileBio");
+				const cachedPic = localStorage.getItem("profilePic");
+
+				if (cachedName) setName(cachedName);
+				if (cachedPronouns) setPronouns(cachedPronouns);
+				if (cachedBio) setBio(cachedBio);
+				if (cachedPic) setProfilePic(cachedPic);
+			} finally {
+				setIsLoading(false);
+			}
+		};
+
+		loadProfile();
+	}, [personalityType, role]);
+
+	const handleSave = async () => {
+		if (!personalityType || !role) {
+			toast.error("Missing required data");
+			return;
 		}
-		setIsEditOpen(false);
+
+		setIsSaving(true);
+		try {
+			const userId = getUserId();
+			console.log("Saving profile for user:", userId);
+
+			// Save to Firebase
+			await saveUserProfile(userId, {
+				name,
+				pronouns,
+				role,
+				bio,
+				avatar: profilePic || undefined,
+				personalityType,
+				personalityScores: personalityScores || undefined,
+			});
+
+			// Also save to localStorage as cache
+			localStorage.setItem("profileName", name);
+			localStorage.setItem("profilePronouns", pronouns);
+			localStorage.setItem("profileBio", bio);
+			if (profilePic) {
+				localStorage.setItem("profilePic", profilePic);
+			}
+
+			toast.success("Profile saved successfully!");
+			setIsEditOpen(false);
+		} catch (error: any) {
+			console.error("Error saving profile:", error);
+			
+			// Show more specific error message
+			const errorMessage = error?.message || "Failed to save profile. Please try again.";
+			toast.error(errorMessage, {
+				duration: 5000,
+			});
+
+			// Still save to localStorage as fallback
+			localStorage.setItem("profileName", name);
+			localStorage.setItem("profilePronouns", pronouns);
+			localStorage.setItem("profileBio", bio);
+			if (profilePic) {
+				localStorage.setItem("profilePic", profilePic);
+			}
+			
+			console.log("Profile saved to localStorage as fallback");
+		} finally {
+			setIsSaving(false);
+		}
 	};
 
-	const handleReset = () => {
-		localStorage.removeItem("profileName");
-		localStorage.removeItem("profilePronouns");
-		localStorage.removeItem("profileBio");
-		localStorage.removeItem("profilePic");
-		clearActivities();
-		setName("Your Name");
-		setPronouns("they/them");
-		setBio("Building wealth through thoughtful, personality-driven investment strategies.");
-		setProfilePic(null);
-		setRecentActivities([]);
-		setIsEditOpen(false);
+	const handleReset = async () => {
+		try {
+			const userId = getUserId();
+			
+			// Delete profile from Firebase
+			await deleteUserProfile(userId);
+			
+			// Clear localStorage
+			localStorage.removeItem("profileName");
+			localStorage.removeItem("profilePronouns");
+			localStorage.removeItem("profileBio");
+			localStorage.removeItem("profilePic");
+			clearActivities();
+			
+			// Reset state
+			setName("Your Name");
+			setPronouns("they/them");
+			setBio("Building wealth through thoughtful, personality-driven investment strategies.");
+			setProfilePic(null);
+			setRecentActivities([]);
+			setIsEditOpen(false);
+			
+			toast.success("Profile reset successfully!");
+		} catch (error) {
+			console.error("Error resetting profile:", error);
+			toast.error("Failed to reset profile. Please try again.");
+			
+			// Still clear localStorage as fallback
+			localStorage.removeItem("profileName");
+			localStorage.removeItem("profilePronouns");
+			localStorage.removeItem("profileBio");
+			localStorage.removeItem("profilePic");
+			clearActivities();
+			setName("Your Name");
+			setPronouns("they/them");
+			setBio("Building wealth through thoughtful, personality-driven investment strategies.");
+			setProfilePic(null);
+			setRecentActivities([]);
+			setIsEditOpen(false);
+		}
 	};
 
 	const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,11 +280,11 @@ const Profile = () => {
 									</div>
 								</div>
 								<DialogFooter className="flex justify-between">
-									<Button variant="destructive" onClick={handleReset}>
+									<Button variant="destructive" onClick={handleReset} disabled={isSaving}>
 										Reset Profile
 									</Button>
-									<Button type="submit" onClick={handleSave}>
-										Save changes
+									<Button type="submit" onClick={handleSave} disabled={isSaving}>
+										{isSaving ? "Saving..." : "Save changes"}
 									</Button>
 								</DialogFooter>
 							</DialogContent>
